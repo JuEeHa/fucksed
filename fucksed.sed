@@ -7,6 +7,7 @@
 # ------------------------------------------------------
 
 # Read the entirety of the program into memory
+
 : read
 $b read_done
 N
@@ -14,9 +15,11 @@ b read
 : read_done
 
 # Strip out non-command characters (including whitespace)
-# Pitfalls of the inverted character group syntax:
-# [^[]] is interpreted as not '[' plus ]
-# [^][+-<] is interpreted as not '[', ']', or anything in range '+' to '<'
+
+# NOTE: Pitfalls of the inverted character group syntax:
+#  [^[]] is interpreted as not '[' plus ]
+#  [^][+-<] is interpreted as not '[', ']', or anything in range '+' to '<'
+
 s/[^][<>.,+-]//g
 
 # ------------------------------------------------------
@@ -145,7 +148,37 @@ next-label:\2\
 labels:\3\
 sed:\4;s/(..) \\\%(..)/\\\%\\1 \\2/,
 
-# TODO: +-
+# +-pm
+# Generate following sed code:
+#  s/\%../&<incs or decs>/
+#  x
+#  s/.*/<label>/
+#  b inc_dec
+#  : <label>
+# It first puts the list of all the increments/decrements to perform after the current cell
+# Afterwards, switch pattern and hold spaces, and replace whatever was in hold space with our label
+# This is so that the subroutine we call is able to return to the right place
+# The subroutine inc_dec is called to handle the actual incrementation / decrementation
+# Finally a label is defined for the subroutine to return to
+
+# \1: the sequence of incements/decrements to perform
+# \2: rest of brainfuck code
+# \3: contents of next-label
+# \4: contents of labels
+# \5: previous sed code
+
+# NOTE: Pitfalls of the character group syntax: +-p is considered a range
+
+s,^bf:([pm+-]+)(.*)\nnext-label:(.*)\nlabels:(.*)\nsed:(.*),bf:\2\
+next-label:\3\
+labels:\4\
+sed:\5;s/\\\%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3,
+
+# If we did the previous replacement, we used the value of next-label, so update it
+# This "subroutine call" will return back to the top of the loop
+
+t update_next_label
+
 # TODO: .
 # TODO: ,
 
