@@ -19,6 +19,40 @@ b read
 # [^][+-<] is interpreted as not '[', ']', or anything in range '+' to '<'
 s/[^][<>.,+-]//g
 
+# ------------------------------------------------------
+# Preprocessing pass to enable optimizations
+# ------------------------------------------------------
+
+# Replace a series of 16 '+'s with a 'p' and 16 '-'s with an 'm'
+# They allow for more conscice and faster code, as the program can increment/decrement the 16s digit directly
+
+s/\+{16}/p/g
+s/\-{16}/m/g
+
+# Express increment / decrement of 9…15 in terms of 'p' or 'm' and then '-' or '+' to bring it back to the right value
+# For example, 15 makes more sense to write as 'p-' than '+++++++++++++++'
+# This works because arithmetic wraps around
+
+s/\+{15}/p-/g
+s/\+{14}/p--/g
+s/\+{13}/p---/g
+s/\+{12}/p----/g
+s/\+{11}/p-----/g
+s/\+{10}/p------/g
+s/\+{9}/p-------/g
+
+s/\-{15}/m+/g
+s/\-{14}/m++/g
+s/\-{13}/m+++/g
+s/\-{12}/m++++/g
+s/\-{11}/m+++++/g
+s/\-{10}/m++++++/g
+s/\-{9}/m+++++++/g
+
+# ------------------------------------------------------
+# Setting up the pattern space
+# ------------------------------------------------------
+
 # Mark the start of the program yet to be compiled with 'bf:'
 s/^/bf:/
 
