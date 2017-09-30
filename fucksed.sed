@@ -52,6 +52,9 @@ s/\-{11}/m+++++/g
 s/\-{10}/m++++++/g
 s/\-{9}/m+++++++/g
 
+# Replace [-] with a zero-out instruction. Since [-] is a common idiom this should give some speedup
+s/\[-\]/n/g
+
 # ------------------------------------------------------
 # Setting up the pattern space
 # ------------------------------------------------------
@@ -156,7 +159,7 @@ loop-labels:\3\
 return-labels:\4\
 sed:\5;s/(..) %(..)/%\\1 \\2/,
 
-# +-pm
+# +- (pm+-)
 # Add the value of next-label return-labels so that the subroutine return generator knows to generate a return to here
 # Generate following sed code:
 #  s/%../&<incs or decs>/
@@ -192,6 +195,23 @@ sed:\6;s/%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3;x,
 # This "subroutine call" will return back to the top of the loop
 
 t update_next_label
+
+# [-] (n)
+# Generate following sed code:
+#  s/%../%00/
+# It replaces the cell tape head is at with 00, regardless of its value
+
+# \1: rest of brainfuck code
+# \2: contents of next-label
+# \3: contents of loop-labels
+# \4: contents of return-labels
+# \5: previous sed code
+
+s,^bf:n(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:\1\
+next-label:\2\
+loop-labels:\3\
+return-labels:\4\
+sed:\5;s/%../%00/,
 
 # TODO: .
 # TODO: ,
@@ -336,7 +356,7 @@ x
 
 # Remove all but the contents of the return-labels: field
 # The labels use base-4 counting with "digits" abcd
-s/^.*\nreturn-labels:([a-d ]+)\n.*$/\1/
+s/^.*\nreturn-labels:([a-d ]*)\n.*$/\1/
 
 # Replace spaces (separating the labels) with two newlines for easier code generation
 # Also add trailing newlines so that every labels is bordered by newlines on both directions
