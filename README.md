@@ -1,6 +1,6 @@
 fucksed
 =======
-Fucksed is a brainfuck to sed compiler writter in sed.
+Fucksed is a brainfuck to sed compiler written in sed.
 
 Usage
 -----
@@ -21,7 +21,7 @@ At the moment `+-><[]` are supported. There are plants to support `.,` as well i
 
 Fucksed uses 8-bit arithmetic with wraparound. This means doing `-` on a cell that has value 00 sets it to ff and doing `+` on a cell that has value ff sets it to 00.
 
-Tape in fucksed is unbounded to the right (meaning you can always > and get more tape). However, doing < at the leftmost cell is underfined and currently a NOP.
+Tape in fucksed is unbounded to the right (meaning you can always > and get more tape). However, doing < at the leftmost cell is undefined and currently a NOP.
 
 Optimizations
 -------------
@@ -31,7 +31,7 @@ Only construct fucksed optimizes at the moment is `[-]` for memory clear, which 
 
 Error handling
 --------------
-At the moment fucksed does no error handling. Upon encountering an unknown command (`.` or `,`) or a command that cannot appear at such a position (`]` without matchin `[`) fucksed simply stops processing the program, and outputs the partial compilation.
+At the moment fucksed does no error handling. Upon encountering an unknown command (`.` or `,`) or a command that cannot appear at such a position (`]` without a matching `[`) fucksed simply stops processing the program, and outputs the partial compilation.
 
 Portability
 -----------

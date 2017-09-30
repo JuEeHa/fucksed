@@ -27,7 +27,7 @@ s/[^][<>.,+-]//g
 # ------------------------------------------------------
 
 # Replace a series of 16 '+'s with a 'p' and 16 '-'s with an 'm'
-# They allow for more conscice and faster code, as the program can increment/decrement the 16s digit directly
+# They allow for more concise and faster code, as the program can increment/decrement the 16s digit directly
 
 s/\+{16}/p/g
 s/\-{16}/m/g
@@ -105,7 +105,7 @@ t update_next_label
 # Generate following sed code:
 #  b <label>
 #  : <label>z
-# It is an uncoditional jump to label <label>, which is before the zeroness check
+# It is an unconditional jump to label <label>, which is before the zeroness check
 # Additionally, it defines the label <label>z after the loop, which provides a place to jump to exit the loop
 
 # \1: rest of brainfuck code
@@ -176,7 +176,7 @@ sed:\5;s/(..) %(..)/%\\1 \\2/,
 # Finally the pattern and hold spaces are switched again, since it can't be done by the return trampoline
 # This is because the return trampoline needs to perform // on our label, and jumps right after finding the correct one
 
-# \1: the sequence of incements/decrements to perform
+# \1: the sequence of increments/decrements to perform
 # \2: rest of brainfuck code
 # \3: contents of next-label
 # \4: contents of loop-labels
