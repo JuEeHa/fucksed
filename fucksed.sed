@@ -60,7 +60,7 @@ s/\-{9}/m+++++++/g
 s/^/bf:/
 
 # Add fields for name generation for branch labels
-s/$/\nnext-label:a\nlabels:/
+s/$/\nnext-label:a\nloop-labels:\nreturn-labels:/
 
 # Add a field for the resultant sed code
 s/$/\nsed:/
@@ -82,13 +82,15 @@ s/$/\nsed:/
 
 # \1: rest of brainfuck code
 # \2: contents of next-label
-# \3: contents of labels
-# \4: previous sed code
+# \3: contents of loop-labels
+# \4: contents of return-labels
+# \5: previous sed code
 
-s,^bf:\[(.*)\nnext-label:(.*)\nlabels:(.*)\nsed:(.*),bf:\1\
+s,^bf:\[(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:\1\
 next-label:\2\
-labels:\3 \2\
-sed:\4;: \2;/\%00/b \2z,
+loop-labels:\3 \2\
+return-labels:\4\
+sed:\5;: \2;/\%00/b \2z,
 
 # If we did the previous replacement, we used the value of next-label, so update it
 # This "subroutine call" will return back to the top of the loop
@@ -96,7 +98,7 @@ sed:\4;: \2;/\%00/b \2z,
 t update_next_label
 
 # ]
-# Remove the topmost label from the labels stack, since no other ] will match with it
+# Remove the topmost label from the loop-labels stack, since no other ] will match with it
 # Generate following sed code:
 #  b <label>
 #  : <label>z
@@ -105,14 +107,16 @@ t update_next_label
 
 # \1: rest of brainfuck code
 # \2: contents of next-label
-# \3: all but topmost label of the stack
-# \4: topmost label of the stack
-# \5: previous sed code
+# \3: all but topmost label of the loop-labels stack
+# \4: topmost label of the loop-labels stack
+# \5: contents of return-labels
+# \6: previous sed code
 
-s,^bf:\](.*)\nnext-label:(.*)\nlabels:(.*) (\w+)\nsed:(.*),bf:\1\
+s,^bf:\](.*)\nnext-label:(.*)\nloop-labels:(.*) (\w+)\nreturn-labels:(.*)\nsed:(.*),bf:\1\
 next-label:\2\
-labels:\3\
-sed:\5;b \4;: \4z,
+loop-labels:\3\
+return-labels:\5\
+sed:\6;b \4;: \4z,
 
 # >
 # Generate following sed code:
@@ -124,13 +128,15 @@ sed:\5;b \4;: \4z,
 
 # \1: rest of brainfuck code
 # \2: contents of next-label
-# \3: contents of labels
-# \4: previous sed code
+# \3: contents of loop-labels
+# \4: contents of return-labels
+# \5: previous sed code
 
-s,^bf:>(.*)\nnext-label:(.*)\nlabels:(.*)\nsed:(.*),bf:\1\
+s,^bf:>(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:\1\
 next-label:\2\
-labels:\3\
-sed:\4;s/\\\%(..) ?(..)?/\\1 \\\%\\2/;s/\\\%\$/\\\%00/,
+loop-labels:\3\
+return-labels:\4\
+sed:\5;s/\\\%(..) ?(..)?/\\1 \\\%\\2/;s/\\\%\$/\\\%00/,
 
 # <
 # Generate following sed code:
@@ -140,39 +146,47 @@ sed:\4;s/\\\%(..) ?(..)?/\\1 \\\%\\2/;s/\\\%\$/\\\%00/,
 
 # \1: rest of brainfuck code
 # \2: contents of next-label
-# \3: contents of labels
-# \4: previous sed code
+# \3: contents of loop-labels
+# \4: contents of return-labels
+# \5: previous sed code
 
-s,^bf:<(.*)\nnext-label:(.*)\nlabels:(.*)\nsed:(.*),bf:\1\
+s,^bf:<(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:\1\
 next-label:\2\
-labels:\3\
-sed:\4;s/(..) \\\%(..)/\\\%\\1 \\2/,
+loop-labels:\3\
+return-labels:\4\
+sed:\5;s/(..) \\\%(..)/\\\%\\1 \\2/,
 
 # +-pm
+# Add the value of next-label return-labels so that the subroutine return generator knows to generate a return to here
 # Generate following sed code:
 #  s/\%../&<incs or decs>/
 #  x
 #  s/.*/<label>/
 #  b inc_dec
 #  : <label>
+#  x
 # It first puts the list of all the increments/decrements to perform after the current cell
 # Afterwards, switch pattern and hold spaces, and replace whatever was in hold space with our label
 # This is so that the subroutine we call is able to return to the right place
 # The subroutine inc_dec is called to handle the actual incrementation / decrementation
-# Finally a label is defined for the subroutine to return to
+# A label is defined for the subroutine to return to
+# Finally the pattern and hold spaces are switched again, since it can't be done by the return trampoline
+# This is because the return trampoline needs to perform // on our label, and jumps right after finding the correct one
 
 # \1: the sequence of incements/decrements to perform
 # \2: rest of brainfuck code
 # \3: contents of next-label
-# \4: contents of labels
-# \5: previous sed code
+# \4: contents of loop-labels
+# \5: contents of return-labels
+# \6: previous sed code
 
 # NOTE: Pitfalls of the character group syntax: +-p is considered a range
 
-s,^bf:([pm+-]+)(.*)\nnext-label:(.*)\nlabels:(.*)\nsed:(.*),bf:\2\
+s,^bf:([pm+-]+)(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:\2\
 next-label:\3\
-labels:\4\
-sed:\5;s/\\\%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3,
+loop-labels:\4\
+return-labels:\5 \3\
+sed:\6;s/\\\%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3;x,
 
 # If we did the previous replacement, we used the value of next-label, so update it
 # This "subroutine call" will return back to the top of the loop
