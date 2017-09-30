@@ -90,7 +90,7 @@ s,^bf:\[(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf
 next-label:\2\
 loop-labels:\3 \2\
 return-labels:\4\
-sed:\5;: \2;/\%00/b \2z,
+sed:\5;: \2;/%00/b \2z,
 
 # If we did the previous replacement, we used the value of next-label, so update it
 # This "subroutine call" will return back to the top of the loop
@@ -120,8 +120,8 @@ sed:\6;b \4;: \4z,
 
 # >
 # Generate following sed code:
-#  s/\%(..) ?(..)?/\1 \%\2/
-#  s/\%$/\%00/
+#  s/%(..) ?(..)?/\1 %\2/
+#  s/%$/%00/
 # The first replacement moves the '%' which marks the position of the tape head one cell to the right
 # In case nothing follows current cell, it results in "<cell> %"
 # To extend the tape in such a situation, the second replacement creates a 00 cell if '%' is right against the end of the line
@@ -136,11 +136,11 @@ s,^bf:>(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:
 next-label:\2\
 loop-labels:\3\
 return-labels:\4\
-sed:\5;s/\\\%(..) ?(..)?/\\1 \\\%\\2/;s/\\\%\$/\\\%00/,
+sed:\5;s/%(..) ?(..)?/\\1 %\\2/;s/%\$/%00/,
 
 # <
 # Generate following sed code:
-#  s/(..) \%(..)/\%\1 \2/
+#  s/(..) %(..)/%\1 \2/
 # It moves the '%' which marks the position of the tape head one cell to the left
 # Since our tape is unbounded only to the right, we don't have to deal with extending the tape
 
@@ -154,12 +154,12 @@ s,^bf:<(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:(.*),bf:
 next-label:\2\
 loop-labels:\3\
 return-labels:\4\
-sed:\5;s/(..) \\\%(..)/\\\%\\1 \\2/,
+sed:\5;s/(..) %(..)/%\\1 \\2/,
 
 # +-pm
 # Add the value of next-label return-labels so that the subroutine return generator knows to generate a return to here
 # Generate following sed code:
-#  s/\%../&<incs or decs>/
+#  s/%../&<incs or decs>/
 #  x
 #  s/.*/<label>/
 #  b inc_dec
@@ -186,7 +186,7 @@ s,^bf:([pm+-]+)(.*)\nnext-label:(.*)\nloop-labels:(.*)\nreturn-labels:(.*)\nsed:
 next-label:\3\
 loop-labels:\4\
 return-labels:\5 \3\
-sed:\6;s/\\\%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3;x,
+sed:\6;s/%\.\./\&\1/;x;s/\.\*/\3/;b inc_dec;: \3;x,
 
 # If we did the previous replacement, we used the value of next-label, so update it
 # This "subroutine call" will return back to the top of the loop
@@ -238,6 +238,9 @@ b print
 
 : print
 
+# Stash a copy of the fields into hold space, because subroutine return generator needs it
+h
+
 # Remove all but the contents of the sed: field
 # FIXME: Do error detection
 s/^(.*)^sed://
@@ -249,3 +252,122 @@ s/^;//
 # Replace ';' with a newline
 # This is to make the program nicer to read and debug
 y/;/\n/
+
+# ------------------------------------------------------
+# Appending the library routines
+# ------------------------------------------------------
+
+# End of main program, print tape and stop executing
+s;$;\np\nd\n;
+
+# Handle arithmetic
+
+s;$;: inc_dec\
+	# We arrive here with tape in hold space and return label in pattern space, switch them around\
+	x\
+\
+	: inc_dec_loop\
+		# %XXp → %X+X, %XXm → %X-X\
+		# p and m are increments and decrements for the 16s digit. Converting them makes the code cleaner\
+		s/%(.)(.)p/%\\1+\\2/\
+		s/%(.)(.)m/%\\1-\\2/\
+\
+		# +: 0→1→2→3→4→5→6→7→8→9→a→b→c→d→e→f\
+		# -: f→e→d→c→b→a→9→8→7→6→5→4→3→2→1→0\
+		s/0\\+/1/\
+		s/1\\+/2/\
+		s/2\\+/3/\
+		s/3\\+/4/\
+		s/4\\+/5/\
+		s/5\\+/6/\
+		s/6\\+/7/\
+		s/7\\+/8/\
+		s/8\\+/9/\
+		s/9\\+/a/\
+		s/a\\+/b/\
+		s/b\\+/c/\
+		s/c\\+/d/\
+		s/d\\+/e/\
+		s/e\\+/f/\
+\
+		s/f-/e/\
+		s/e-/d/\
+		s/d-/c/\
+		s/c-/b/\
+		s/b-/a/\
+		s/a-/9/\
+		s/9-/8/\
+		s/8-/7/\
+		s/7-/6/\
+		s/6-/5/\
+		s/5-/4/\
+		s/4-/3/\
+		s/3-/2/\
+		s/2-/1/\
+		s/1-/0/\
+\
+		# Carry/borrow:\
+		# f+ → +0, 0- → -f\
+		s/f\\+/+0/\
+		s/0-/-f/\
+\
+		# If carry or borrow moves a + or - right after % (the tape head pointer), remove the + or -\
+		# This is because we implement a mod 0xff arithmetic where inc 00 gives ff and dec ff gives 00\
+		# %ff+ → %f+0 → %+00\
+		# %00- → %0-f → %-ff\
+		# Removing the + or - thus implements this mod 0xff arithmetic\
+		s/%[+-](..)/%\\1/\
+\
+		# Run the loop until we have done no replacements\
+		t inc_dec_loop\
+\
+	# Jump into the subroutine return trampoline\
+	# It requires the return label to be in pattern space, so switch pattern space and hold space around yet again\
+	x\
+	b sub_ret\
+;
+
+# ------------------------------------------------------
+# Generating the code to return from a subroutine
+# ------------------------------------------------------
+
+# Switch code to hold space and the saved fields to pattern space
+x
+
+# Remove all but the contents of the return-labels: field
+# The labels use base-4 counting with "digits" abcd
+s/^.*\nreturn-labels:([a-d ]+)\n.*$/\1/
+
+# Replace spaces (separating the labels) with two newlines for easier code generation
+# Also add trailing newlines so that every labels is bordered by newlines on both directions
+s/$/ /
+s/ /\n\n/g
+
+# For every label, generate following sed code:
+#  /^<label>$/b <label>
+
+s,\n([a-d ]+)\n,\n/^\1$/b \1\n,g
+
+# Prefix the code with the label "sub_ret"
+s,^,: sub_ret,
+
+# Append the generated code to the main program / library routines currently stored in the hold space
+H
+
+# Switch the program code back to the pattern space
+x
+
+# ------------------------------------------------------
+# Finalizing the code
+# ------------------------------------------------------
+
+# Remove comments from the code
+# NOTE: this doesn't care where in the line # or if it is commented or not
+s/\#[^\n]*(\n|$)/\1/g
+
+# Remove indentation from lines
+s/(^|\n)[[:space:]]+/\1/g
+
+# Remove empty lines from the code
+s/\n{2,}/\n/g
+s/^\n|\n$//g
